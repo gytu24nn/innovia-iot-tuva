@@ -27,6 +27,8 @@ builder.Services.AddSingleton<DeviceRegistryConfig>(sp =>
     return new DeviceRegistryConfig { BaseUrl = cfg?["BaseUrl"] ?? "http://localhost:5101" };
 });
 // Realtime publisher (SignalR client)
+// Här skapas en koppling till SignalR huber för kunna skicka data i realtid till ex frontend
+// Kopplingen startas inte här. 
 builder.Services.AddSingleton(new RealtimeConfig
 {
     HubUrl = "http://localhost:5103/hub/telemetry"
@@ -41,9 +43,10 @@ builder.Services.AddSingleton<HubConnection>(sp =>
 });
 builder.Services.AddSingleton<IRealtimePublisher, SignalRRealtimePublisher>();
 
+// Här skapas appen. 
 var app = builder.Build();
 
-// Start SignalR hub connection
+// Start SignalR hub connection. Här startar SignalR-anslutningen som skapades innan.
 using (var scope = app.Services.CreateScope())
 {
     var hub = scope.ServiceProvider.GetRequiredService<HubConnection>();
@@ -67,8 +70,10 @@ app.UseSwaggerUI(c =>
 // Redirect root to Swagger UI for convenience
 app.MapGet("/", () => Results.Redirect("/swagger"));
 
+// Här är en post om datan skickas via HTTP post. 
 app.MapPost("/ingest/http/{tenant}", async (string tenant, MeasurementBatch payload, IValidator<MeasurementBatch> validator, IngestService ingest, ILogger<Program> log) =>
 {
+    // Här valideras de om de har rätt innehåll. 
     var result = await validator.ValidateAsync(payload);
     if (!result.IsValid)
     {
@@ -76,11 +81,13 @@ app.MapPost("/ingest/http/{tenant}", async (string tenant, MeasurementBatch payl
         return Results.BadRequest(result.Errors);
     }
 
+    // Om de som skickas har rätt innehåll skickas de vidare till IngestService där datan sparas i databasen. 
     await ingest.ProcessAsync(tenant, payload);
     log.LogInformation("Ingested {Count} metrics for serial {Serial} in tenant {Tenant} at {Time}", payload.Metrics.Count, payload.DeviceId, tenant, payload.Timestamp);
     return Results.Accepted();
 });
 
+// Detta är en get för att man ska kunna kontrollera om datan sparades i databasen. 
 app.MapGet("/ingest/debug/device/{deviceId:guid}", async (Guid deviceId, IngestDbContext db) =>
 {
     var count = await db.Measurements.Where(m => m.DeviceId == deviceId).CountAsync();
@@ -89,6 +96,7 @@ app.MapGet("/ingest/debug/device/{deviceId:guid}", async (Guid deviceId, IngestD
 });
 
 // --- MQTT subscriber: consume Edge.Simulator messages and reuse the same processing pipeline ---
+// Här lyssnar MQTT på meddelande från edge.simulator. 
 var mqttFactory = new MqttFactory();
 var mqttClient = mqttFactory.CreateMqttClient();
 var mqttOptions = new MqttClientOptionsBuilder()
@@ -96,12 +104,16 @@ var mqttOptions = new MqttClientOptionsBuilder()
     .Build();
 
 // Subscribe to tenants/{tenantSlug}/devices/{serial}/measurements
+// topic som simulatorn använder
 var mqttTopic = "tenants/+/devices/+/measurements";
 
 mqttClient.ApplicationMessageReceivedAsync += async e =>
 {
     try
     {
+        // Om då edge.simulator skickar ett meddelande i MQTT så kommer man in i denna try. 
+
+        // Här delar topicen upp för att hitta tenantSlug och deviceSerial. 
         var topic = e.ApplicationMessage.Topic ?? string.Empty;
         var parts = topic.Split('/', StringSplitOptions.RemoveEmptyEntries);
         // Expected: tenants/{tenantSlug}/devices/{serial}/measurements
@@ -111,10 +123,12 @@ mqttClient.ApplicationMessageReceivedAsync += async e =>
             var serial = parts[3];
 
             // Deserialize payload into MeasurementBatch (same shape as HTTP ingest)
+            // Här läser man ut JSON från MQTT meddelandet. 
             var payloadBytes = e.ApplicationMessage.PayloadSegment.ToArray();
             var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var batch = JsonSerializer.Deserialize<MeasurementBatch>(payloadBytes, jsonOptions);
 
+            // Fel hantering om man ej kunde läsa ut ett meddelande ur den. 
             if (batch is null)
             {
                 Console.WriteLine($"[MQTT] Skipping: could not deserialize payload on topic '{topic}'");
@@ -122,11 +136,13 @@ mqttClient.ApplicationMessageReceivedAsync += async e =>
             }
 
             // Ensure batch.DeviceId (serial) is set/consistent
+            // Om deviceId saknas i payloaden → sätt den från topicen.
             if (string.IsNullOrWhiteSpace(batch.DeviceId))
             {
                 batch.DeviceId = serial;
             }
 
+            // Här skapas en ny tjänst-scope och kör ingestService för att spara de i databasen. 
             using var scope = app.Services.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IngestService>();
             await svc.ProcessAsync(tenantSlug, batch);
@@ -140,6 +156,8 @@ mqttClient.ApplicationMessageReceivedAsync += async e =>
     }
 };
 
+
+// här görs det ett försök att ansluta till MQTT och prenumerara. 
 try
 {
     await mqttClient.ConnectAsync(mqttOptions);
@@ -157,9 +175,12 @@ catch (Exception ex)
 
 app.Run();
 
+// Efter här skapas logiken som filen kör på så det skapas inte efter nu utan de används redan. (hade kunnat placera detta i olika filer och importerat in istället)
+
+// en klass som pratar med databasen för att den arver ifrån dbcontext. 
 public class IngestDbContext : DbContext
 {
-    public IngestDbContext(DbContextOptions<IngestDbContext> o) : base(o) {}
+    public IngestDbContext(DbContextOptions<IngestDbContext> o) : base(o) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -169,6 +190,8 @@ public class IngestDbContext : DbContext
 
     public DbSet<MeasurementRow> Measurements => Set<MeasurementRow>();
 }
+
+// En vanlig klass som används för att strukturera upp hur de ska sparas i databasen.
 public class MeasurementRow
 {
     public long Id { get; set; }
@@ -178,6 +201,8 @@ public class MeasurementRow
     public string Type { get; set; } = "";
     public double Value { get; set; }
 }
+
+// Används för att säkerställa att inkommande data är giltig. Så om något av fälten här nedan är tomma returneras 400. 
 public class MeasurementBatchValidator : AbstractValidator<MeasurementBatch>
 {
     public MeasurementBatchValidator()
@@ -187,6 +212,8 @@ public class MeasurementBatchValidator : AbstractValidator<MeasurementBatch>
         RuleFor(x => x.Metrics).NotEmpty();
     }
 }
+
+// den här klassen hanterar alltså att ta emot data och spara den. Den sparar alltså mätningarna i databasen och skickar de vidare till SignalR i realtid. 
 public class IngestService
 {
     private readonly IngestDbContext _db;
@@ -200,7 +227,8 @@ public class IngestService
 
         foreach (var m in payload.Metrics)
         {
-            _db.Measurements.Add(new MeasurementRow {
+            _db.Measurements.Add(new MeasurementRow
+            {
                 Time = payload.Timestamp,
                 TenantId = ids.TenantId,
                 DeviceId = ids.DeviceId,
@@ -235,6 +263,8 @@ public class DeviceRegistryClient
         _cfg = cfg;
     }
 
+
+    // Denna del hämtar tenantId och deviceId ifrån DeviceRegistry. 
     public async Task<(Guid TenantId, Guid DeviceId)> ResolveAsync(string tenantSlug, string deviceSerial)
     {
         var cacheKey = $"{tenantSlug}:{deviceSerial}";
@@ -265,6 +295,7 @@ public interface IRealtimePublisher
     Task PublishAsync(string tenantSlug, Guid deviceId, string type, double value, DateTimeOffset time);
 }
 
+// Denna skickad datan vidare till SignalR. 
 public class SignalRRealtimePublisher : IRealtimePublisher
 {
     private readonly HubConnection _conn;

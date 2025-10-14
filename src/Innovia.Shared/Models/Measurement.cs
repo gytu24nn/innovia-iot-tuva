@@ -1,4 +1,6 @@
 namespace Innovia.Shared.Models;
+
+// en mer intern modell av en mätning väldigt lik den som används i Ingest.Gateway.  
 public class Measurement
 {
     public DateTimeOffset Time { get; set; }

@@ -30,6 +30,7 @@ app.MapGet("/portal/{tenant}/rooms/{roomId}/latest", (string tenant, Guid roomId
     metrics = new [] { new { type = "co2", value = 950.0, unit = "ppm" }, new { type = "temperature", value = 22.4, unit = "C" } }
 }));
 
+// Denna get hämtaren sekvens av mätdata under en tid för att kunna visa visuellt hur det förändrats. 
 app.MapGet("/portal/{tenant}/devices/{deviceId}/series",
     async (Guid tenant, Guid deviceId, string type, DateTimeOffset from, DateTimeOffset to, PortalDbContext db) =>
 {
@@ -43,6 +44,7 @@ app.MapGet("/portal/{tenant}/devices/{deviceId}/series",
 });
 
 // Return ALL measurements for a device (optionally filter by type/from/to)
+// Hämtar alla mätningar för en enhet. 
 app.MapGet("/portal/{tenant}/devices/{deviceId}/measurements",
     async (Guid tenant, Guid deviceId, DateTimeOffset? from, DateTimeOffset? to, string? type, PortalDbContext db) =>
 {
@@ -60,6 +62,7 @@ app.MapGet("/portal/{tenant}/devices/{deviceId}/measurements",
 });
 
 // Return ALL series for a device grouped per type (points per type)
+// Hämtar alla serier typer för en enhet ex temperature. 
 app.MapGet("/portal/{tenant}/devices/{deviceId}/series/all",
     async (Guid tenant, Guid deviceId, DateTimeOffset? from, DateTimeOffset? to, PortalDbContext db) =>
 {
@@ -82,6 +85,7 @@ app.MapGet("/portal/{tenant}/devices/{deviceId}/series/all",
 
 app.Run();
 
+// Detta är för att kunna hämta data ur databasen 
 public class PortalDbContext : DbContext
 {
     public PortalDbContext(DbContextOptions<PortalDbContext> options) : base(options) { }
@@ -94,6 +98,7 @@ public class PortalDbContext : DbContext
     }
 }
 
+// Detta är en klass för hur measurment ska skrivas i databasen. 
 public class MeasurementRow
 {
     public long Id { get; set; }

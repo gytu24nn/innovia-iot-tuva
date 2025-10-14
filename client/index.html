@@ -5,15 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     
+        <!--Hämtar signalR klienten för javascript-->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
         <script>
+        // Här skapas signalR anslutningen till Realtime.Hub.  port: 5103 
         (async () => {
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("http://localhost:5103/hub/telemetry")
             .withAutomaticReconnect()
             .build();
+        // Startar anslutningen på servern.
         await connection.start();
+        // Anropar en metod i servern som heter JoinTenant och klienten tillhör tenant "innovia".
         await connection.invoke("JoinTenant", "innovia");
+        // Lyssnar på händelsen som skickas från servern varje gång.
         connection.on("measurementReceived", m => console.log("Realtime:", m));
         })();
         </script>
