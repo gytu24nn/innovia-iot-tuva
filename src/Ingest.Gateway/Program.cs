@@ -43,8 +43,22 @@ builder.Services.AddSingleton<HubConnection>(sp =>
 });
 builder.Services.AddSingleton<IRealtimePublisher, SignalRRealtimePublisher>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 // Här skapas appen. 
 var app = builder.Build();
+
+app.UseCors();
 
 // Start SignalR hub connection. Här startar SignalR-anslutningen som skapades innan.
 using (var scope = app.Services.CreateScope())

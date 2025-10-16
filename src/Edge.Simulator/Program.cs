@@ -8,7 +8,7 @@ using System.Net.Http.Json;
 var tenantSlug = Environment.GetEnvironmentVariable("TENANT_SLUG") ?? "innovia";
 var deviceRegistryBase = Environment.GetEnvironmentVariable("DEVICE_REGISTRY_BASE") ?? "http://localhost:5101";
 var mqttHost = Environment.GetEnvironmentVariable("MQTT_HOST") ?? "localhost";
-var mqttPort = int.TryParse(Environment.GetEnvironmentVariable("MQTT_PORT"), out var p) ? p : 1893;
+var mqttPort = int.TryParse(Environment.GetEnvironmentVariable("MQTT_PORT"), out var p) ? p : 1883;
 
 System.Console.WriteLine($"Edge.simulator starting... tenantSlug={tenantSlug}, DeviceRegistry={deviceRegistryBase}, MQTT={mqttHost}:{mqttPort}");
 
