@@ -3,6 +3,8 @@ using MQTTnet.Client;
 using System.Text.Json;
 using System.Text;
 using System.Net.Http.Json;
+using System.Data.Common;
+using System.ComponentModel.DataAnnotations;
 
 // Hämta konfiguration från miljövariabler
 var tenantSlug = Environment.GetEnvironmentVariable("TENANT_SLUG") ?? "innovia";
@@ -57,6 +59,7 @@ string InferMetricType(Device d)
 
 // Här skapas en random för att kunna få ut random data till låsas sensorerna. 
 var rand = new Random();
+var motionCounts = new Dictionary<string, int>();
 
 // Variabler för loop och lista för devices. 
 var lastRefresh = DateTimeOffset.MinValue;
@@ -95,7 +98,7 @@ while (true)
             "temperature" => new object[] { new { type = "temperature", value = 21.5 + rand.NextDouble(), unit = "C" } },
             "humidity" => new object[] { new { type = "humidity", value = 30 + rand.NextDouble() * 30, unit = "%" } },
             "light" => new object[] { new { type = "light", value = 300 + rand.Next(0, 600), unit = "lm" } },
-            "motion" => new object[] { new { type = "motion", value = rand.Next(0,2) == 1, unit = "" } },
+            "motion" => new object[] { new { type = "motion", value = motionCounts.TryGetValue(d.Serial, out var count) ? (rand.NextDouble() < 0.5 ? motionCounts[d.Serial] = count + 1 : count) : (motionCounts[d.Serial] = 0), unit = "detections" } },
             _ => Array.Empty<object>()
         };
 
@@ -113,7 +116,7 @@ while (true)
 
         // MQTT-topic som meddelandet skickas till måste matcha Ingest.GateWay.
         // Dynamisk MQTT topic
-        var topic = "tenants/innovia/devices/dev-101/measurements";
+        var topic = $"tenants/{tenantSlug}/devices/{d.Serial}/measurements";
         var json = JsonSerializer.Serialize(payload);
 
         // Skapa MQTT meddelande. 
