@@ -255,7 +255,7 @@ public class IngestService
         // Publish in realtime
         foreach (var m in payload.Metrics)
         {
-            await _rt.PublishAsync(tenant, ids.DeviceId, m.Type, m.Value, payload.Timestamp);
+            await _rt.PublishAsync(tenant, ids.DeviceId, m.Type, m.Value, m.Unit, payload.Timestamp);
         }
     }
 }
@@ -306,7 +306,7 @@ public class RealtimeConfig
 
 public interface IRealtimePublisher
 {
-    Task PublishAsync(string tenantSlug, Guid deviceId, string type, double value, DateTimeOffset time);
+    Task PublishAsync(string tenantSlug, Guid deviceId, string type, double value, string unit, DateTimeOffset time);
 }
 
 // Denna skickad datan vidare till SignalR. 
@@ -315,7 +315,7 @@ public class SignalRRealtimePublisher : IRealtimePublisher
     private readonly HubConnection _conn;
     public SignalRRealtimePublisher(HubConnection conn) => _conn = conn;
 
-    public async Task PublishAsync(string tenantSlug, Guid deviceId, string type, double value, DateTimeOffset time)
+    public async Task PublishAsync(string tenantSlug, Guid deviceId, string type, double value, string unit, DateTimeOffset time)
     {
         var payload = new
         {
@@ -323,6 +323,7 @@ public class SignalRRealtimePublisher : IRealtimePublisher
             DeviceId = deviceId,
             Type = type,
             Value = value,
+            Unit = unit,
             Time = time
         };
         await _conn.InvokeAsync("PublishMeasurement", payload);

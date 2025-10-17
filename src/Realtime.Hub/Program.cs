@@ -46,5 +46,6 @@ public record RealtimeMeasurement(
     System.Guid DeviceId,
     string Type,
     double Value,
+    string Unit,
     System.DateTimeOffset Time
 );
