@@ -5,6 +5,7 @@ using System.Text;
 using System.Net.Http.Json;
 using System.Data.Common;
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 
 // Hämta konfiguration från miljövariabler
 var tenantSlug = Environment.GetEnvironmentVariable("TENANT_SLUG") ?? "innovia";
@@ -42,24 +43,72 @@ catch (Exception ex)
 var tenant = await http.GetFromJsonAsync<Tenant>($"/api/tenants/by-slug/{tenantSlug}")
     ?? throw new Exception($"Tenant with slug '{tenantSlug}' not found");
 
-// Här avgörs det vad för sensorer/mätvärden per device ska få beroende på vad de inne håller i model. 
-string InferMetricType(Device d)
-{
-    var m = d.Model?.ToLowerInvariant() ?? "";
-    if (m.Contains("co2")) return "co2";
-    if (m.Contains("temperature")) return "temperature";
-    if (m.Contains("humidity")) return "humidity";
-    if (m.Contains("light")) return "light";
-    if (m.Contains("motion")) return "motion";
-
-    return "";
-};
-
-// Efter det skapas random generator och variabler för loop.
-
 // Här skapas en random för att kunna få ut random data till låsas sensorerna. 
 var rand = new Random();
 var motionCounts = new Dictionary<string, int>();
+
+string NormalizeType(string model)
+{
+    var m = model.ToLowerInvariant();
+
+    var words = Regex.Matches(m, @"\w+").Select(x => x.Value);
+
+    var knownTypes = new Dictionary<string, string>
+    {
+        { "temp", "temperature" },
+        { "temperature", "temperature" },
+        { "co2", "co2" },
+        { "humid", "humidity" },
+        { "humidity", "humidity" },
+        { "light", "light" },
+        { "motion", "motion" }
+    };
+
+    foreach (var word in words)
+    {
+        if (knownTypes.TryGetValue(word, out var type)) return type;
+    }
+
+    return "Okänd";
+};
+
+string InferUnit(string type) => type.ToLowerInvariant() switch
+{
+    "temperature" => "°C",
+    "humidity" => "%",
+    "co2" => "ppm",
+    "light" => "lm",
+    "motion" => "detections",
+    _ => "unit"
+};
+
+object[] GenerateMetrics(Device device)
+{
+    if (string.IsNullOrEmpty(device.Model)) return Array.Empty<object>();
+
+    var types = device.Model.Split(',', StringSplitOptions.RemoveEmptyEntries);
+    var metrics = new List<object>();
+
+    foreach (var type in types)
+    {
+        var t = NormalizeType(type.Trim());
+        double value = t switch
+        {
+            "co2" => 400 + rand.Next(0, 800),
+            "temperature" => 15 + rand.NextDouble() * 15,
+            "humidity" => 20 + rand.NextDouble() * 60,
+            "light" => 100 + rand.Next(0, 1000),
+            "motion" => motionCounts.TryGetValue(device.Serial, out var count)
+                        ? (rand.NextDouble() < 0.3 ? motionCounts[device.Serial] = count + 1 : count)
+                        : (motionCounts[device.Serial] = 0),
+            _ => rand.NextDouble() * 100
+        };
+
+        metrics.Add(new { type = t, value, unit = InferUnit(t) });
+    }
+
+    return metrics.ToArray();
+}
 
 // Variabler för loop och lista för devices. 
 var lastRefresh = DateTimeOffset.MinValue;
@@ -90,18 +139,7 @@ while (true)
     // skicka mätvärde per device
     foreach(var d in devices)
     {
-        var metricType = InferMetricType(d);
-
-        object[] metrics = metricType switch
-        {
-            "co2" => new object[] { new { type = "co2", value = 900 + rand.Next(0, 700), unit = "ppm" } },
-            "temperature" => new object[] { new { type = "temperature", value = 21.5 + rand.NextDouble(), unit = "C" } },
-            "humidity" => new object[] { new { type = "humidity", value = 30 + rand.NextDouble() * 30, unit = "%" } },
-            "light" => new object[] { new { type = "light", value = 300 + rand.Next(0, 600), unit = "lm" } },
-            "motion" => new object[] { new { type = "motion", value = motionCounts.TryGetValue(d.Serial, out var count) ? (rand.NextDouble() < 0.5 ? motionCounts[d.Serial] = count + 1 : count) : (motionCounts[d.Serial] = 0), unit = "detections" } },
-            _ => Array.Empty<object>()
-        };
-
+        var metrics = GenerateMetrics(d);
         // Hoppar över devices utan metrics
         if (metrics.Length == 0) continue;
 
@@ -130,7 +168,7 @@ while (true)
         {
             // Skickar meddelandet till MQTT. 
             await mqtt.PublishAsync(message);
-            Console.WriteLine($"[{DateTimeOffset.UtcNow:o}] {d.Serial} ({metricType}) => {json}");
+            Console.WriteLine($"[{DateTimeOffset.UtcNow:o}] {d.Serial} ({metrics}) => {json}");
         }
         catch (Exception ex)
         {
