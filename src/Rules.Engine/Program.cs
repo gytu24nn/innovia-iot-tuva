@@ -39,6 +39,8 @@ var hubUrl = builder.Configuration.GetSection("Realtime")["HubUrl"]
 // --- Services ---
 builder.Services.AddDbContext<RulesDbContext>(o => o.UseNpgsql(rulesConn));
 builder.Services.AddDbContext<IngestReadDbContext>(o => o.UseNpgsql(ingestConn));
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 // SignalR client to publish alerts in real time
 builder.Services.AddSingleton<HubConnection>(_ =>
@@ -52,6 +54,17 @@ builder.Services.AddHostedService<RulesWorker>();
 
 // Minimal admin/read endpoints (optional but useful for MVP)
 var app = builder.Build();
+
+// Enable Swagger always (not only in Development)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "DeviceRegistry.Api v1");
+    c.RoutePrefix = string.Empty;
+});
+// Redirect root to Swagger UI for convenience
+// app.MapGet("/", () => Results.Redirect("/swagger"));
+
 
 // Ensure DB exists (MVP convenience). In production, prefer EF migrations.
 using (var scope = app.Services.CreateScope())
