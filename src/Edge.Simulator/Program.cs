@@ -47,6 +47,14 @@ var tenant = await http.GetFromJsonAsync<Tenant>($"/api/tenants/by-slug/{tenantS
 var rand = new Random();
 var motionCounts = new Dictionary<string, int>();
 
+// någon metod för att sätta typer. 
+/* 
+Den här metoden tar in en sträng modellnamn och försöker då identifiera vilken typ det är. 
+Den normaliserar texten genom att göra den till lowercase, delar upp den i ord och jämför då mot de kända sensortyperna.
+Efter de returnerar den en sträng som representerar den "standardiserade" sensortypen ex co2.
+Om ingen då matchar den typen som är standardiserad blir det okänd. 
+För att göra det så dynamiskt som möjligt. 
+*/
 string NormalizeType(string model)
 {
     var m = model.ToLowerInvariant();
@@ -72,6 +80,12 @@ string NormalizeType(string model)
     return "Okänd";
 };
 
+// Bestämmer unit metod
+/*
+Den här metoden tar emot sensortypen från föra metoden tex co2 och returnerar då rätt unit. 
+Dessa unit används sen när mätvärde skickas till frontend och då skrivs unit också ut samtidigt. 
+Om det då inte finns något typ returneras unit som standard för att göra de så dynamiskt och användarvänligt som möjligt.
+*/
 string InferUnit(string type) => type.ToLowerInvariant() switch
 {
     "temperature" => "°C",
@@ -82,6 +96,15 @@ string InferUnit(string type) => type.ToLowerInvariant() switch
     _ => "unit"
 };
 
+
+/*
+Denna metoden generar simulerade slumpmässiga mätvärden för en viss enhet.
+Därför den innehåller en foreach loop för att den ska göra de för varje enhet/device och inte bara än.
+Metoden använder också här sensortyperna som anges i enhetens model fält och skapar värden för varje typ.
+Alla typer har olika metoder nästan men för att göra de då dynamiskt för att alla kanske inte har just dessa modeller.
+Valde jag att göra okända typer får ett generiskt slumpvärde mellan 0-100 detta är inte super dynamiskt men bättre än vad min kod gjorde innan. 
+Resultatet returneras som en array av objekt där varje objekt innehåller sensortyp, värde och enhet. 
+*/
 object[] GenerateMetrics(Device device)
 {
     if (string.IsNullOrEmpty(device.Model)) return Array.Empty<object>();

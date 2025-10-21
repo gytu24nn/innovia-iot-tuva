@@ -7,6 +7,8 @@ builder.Services.AddDbContext<InnoviaDbContext>(o =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Har fått lägga till cors för att kunna fetcha de i frontend 
+// Lagt till de i alla filer jag har arbetat i som jag behöver fetcha in. 
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
