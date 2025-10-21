@@ -8,4 +8,10 @@
   <ItemGroup>
     <PackageReference Include="MQTTnet" Version="4.3.4.1084" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

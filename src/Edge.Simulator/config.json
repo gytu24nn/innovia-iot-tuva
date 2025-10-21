@@ -1,0 +1,20 @@
+{
+    "KnownTypes": {
+        "temp": "temperature",
+        "temperature": "temperature",
+        "co2": "co2",
+        "humid": "humidity",
+        "humidity": "humidity",
+        "light": "light",
+        "motion": "motion"
+    },
+    "Units": {
+        "temperature": "°C",
+        "humidity": "%",
+        "co2": "ppm",
+        "light": "lm",
+        "motion": "detections"
+    },
+    "intervalSeconds": 10,
+    "refreshMinutes": 1
+}

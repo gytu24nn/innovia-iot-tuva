@@ -6,6 +6,15 @@ using System.Net.Http.Json;
 using System.Data.Common;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+using System.Reflection.Metadata.Ecma335;
+
+// läser in konfiguration från JSON
+var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+var configJson = await File.ReadAllTextAsync(configPath);
+var config = JsonSerializer.Deserialize<SimulatorConfig>(configJson) ?? throw new Exception("Falied to load config.json");
+
+System.Console.WriteLine("config loaded:");
+System.Console.WriteLine(JsonSerializer.Serialize(config, new JsonSerializerOptions {WriteIndented = true}));
 
 // Hämta konfiguration från miljövariabler
 var tenantSlug = Environment.GetEnvironmentVariable("TENANT_SLUG") ?? "innovia";
@@ -54,27 +63,15 @@ Den normaliserar texten genom att göra den till lowercase, delar upp den i ord 
 Efter de returnerar den en sträng som representerar den "standardiserade" sensortypen ex co2.
 Om ingen då matchar den typen som är standardiserad blir det okänd. 
 För att göra det så dynamiskt som möjligt. 
+Använder mig nu av en config.json fil för att hämta knownTypes.
 */
 string NormalizeType(string model)
 {
-    var m = model.ToLowerInvariant();
-
-    var words = Regex.Matches(m, @"\w+").Select(x => x.Value);
-
-    var knownTypes = new Dictionary<string, string>
-    {
-        { "temp", "temperature" },
-        { "temperature", "temperature" },
-        { "co2", "co2" },
-        { "humid", "humidity" },
-        { "humidity", "humidity" },
-        { "light", "light" },
-        { "motion", "motion" }
-    };
+    var words = Regex.Matches(model.ToLowerInvariant(), @"\w+").Select(x => x.Value);
 
     foreach (var word in words)
     {
-        if (knownTypes.TryGetValue(word, out var type)) return type;
+        if (config.KnownTypes.TryGetValue(word, out var type)) return type;
     }
 
     return "Okänd";
@@ -85,16 +82,11 @@ string NormalizeType(string model)
 Den här metoden tar emot sensortypen från föra metoden tex co2 och returnerar då rätt unit. 
 Dessa unit används sen när mätvärde skickas till frontend och då skrivs unit också ut samtidigt. 
 Om det då inte finns något typ returneras unit som standard för att göra de så dynamiskt och användarvänligt som möjligt.
+Använder mig nu av en config.json fil för att hämta units för att göra de mer dynamiskt. 
 */
-string InferUnit(string type) => type.ToLowerInvariant() switch
-{
-    "temperature" => "°C",
-    "humidity" => "%",
-    "co2" => "ppm",
-    "light" => "lm",
-    "motion" => "detections",
-    _ => "unit"
-};
+string InferUnit(string type) {
+    return config.Units.TryGetValue(type.ToLowerInvariant(), out var unit) ? unit : "unit";
+}
 
 
 /*
@@ -141,7 +133,7 @@ List<Device> devices = new();
 // Simulerar data och skickar meddelanden. 
 while (true)
 {
-    if ((DateTimeOffset.UtcNow - lastRefresh) > TimeSpan.FromMinutes(1) || devices.Count == 0)
+    if ((DateTimeOffset.UtcNow - lastRefresh) > TimeSpan.FromMinutes(config.refreshMinutes) || devices.Count == 0)
     {
         try
         {
@@ -206,7 +198,7 @@ while (true)
 
 
     //Här ställer man in hur många sekunder innan nästa meddelande ska skickas iväg. 
-    await Task.Delay(TimeSpan.FromSeconds(10));
+    await Task.Delay(TimeSpan.FromSeconds(config.intervalSeconds));
 }
 
 
@@ -216,3 +208,11 @@ while (true)
 record Tenant(Guid Id, string Name, string Slug);
 // Divice-Model denna matchar också DeviceRegistry API. 
 record Device(Guid Id, Guid TenantId, Guid? RoomId, string Model, string Serial, string Status);
+
+// model för vad som finns i config. 
+record SimulatorConfig(
+    Dictionary<string, string> KnownTypes,
+    Dictionary<string, string> Units,
+    int intervalSeconds,
+    int refreshMinutes
+);
