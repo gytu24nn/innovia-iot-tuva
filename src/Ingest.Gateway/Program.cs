@@ -205,7 +205,8 @@ public class IngestDbContext : DbContext
     public DbSet<MeasurementRow> Measurements => Set<MeasurementRow>();
 }
 
-// En vanlig klass som används för att strukturera upp hur de ska sparas i databasen.
+// En vanlig klass som används för att strukturera upp hur de ska sparas i databasen. 
+// Lagt till unit
 public class MeasurementRow
 {
     public long Id { get; set; }
@@ -234,6 +235,8 @@ public class IngestService
     private readonly DeviceRegistryClient _registry;
     private readonly IRealtimePublisher _rt;
     public IngestService(IngestDbContext db, DeviceRegistryClient registry, IRealtimePublisher rt) { _db = db; _registry = registry; _rt = rt; }
+
+    // Samma som innan fast bara lagt till unit för att kunna skicka de till frontend. 
     public async Task ProcessAsync(string tenant, MeasurementBatch payload)
     {
         // Resolve tenant and device using DeviceRegistry (tenant slug + device serial)
@@ -304,6 +307,7 @@ public class RealtimeConfig
     public string HubUrl { get; set; } = "http://localhost:5103/hub/telemetry";
 }
 
+// Lagt till unit i denna med
 public interface IRealtimePublisher
 {
     Task PublishAsync(string tenantSlug, Guid deviceId, string type, double value, string unit, DateTimeOffset time);
@@ -315,6 +319,7 @@ public class SignalRRealtimePublisher : IRealtimePublisher
     private readonly HubConnection _conn;
     public SignalRRealtimePublisher(HubConnection conn) => _conn = conn;
 
+    // Lagt till unit här för att jag ska kunna skriva ut unit i frontend i mitt projekt annars skickas det inte med.
     public async Task PublishAsync(string tenantSlug, Guid deviceId, string type, double value, string unit, DateTimeOffset time)
     {
         var payload = new

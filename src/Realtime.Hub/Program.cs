@@ -41,6 +41,7 @@ public class TelemetryHub : Hub
 }
 
 // Här definieras strukturen på mätningen som skickats via huben. 
+// Lagt till unit för att kunna skriva ut de i frontend.
 public record RealtimeMeasurement(
     string TenantSlug,
     System.Guid DeviceId,
