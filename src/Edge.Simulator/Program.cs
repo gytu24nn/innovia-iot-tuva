@@ -107,17 +107,25 @@ object[] GenerateMetrics(Device device)
     foreach (var type in types)
     {
         var t = NormalizeType(type.Trim());
-        double value = t switch
+        double value;
+
+        // Om värdeintervall finns i config.json, använd det
+        if (config.ValueRanges.TryGetValue(t.ToLowerInvariant(), out var range))
         {
-            "co2" => 400 + rand.Next(0, 800),
-            "temperature" => 15 + rand.NextDouble() * 15,
-            "humidity" => 20 + rand.NextDouble() * 60,
-            "light" => 100 + rand.Next(0, 1000),
-            "motion" => motionCounts.TryGetValue(device.Serial, out var count)
-                        ? (rand.NextDouble() < 0.3 ? motionCounts[device.Serial] = count + 1 : count)
-                        : (motionCounts[device.Serial] = 0),
-            _ => rand.NextDouble() * 100
-        };
+            value = range.min + rand.NextDouble() * (range.max - range.min);
+        }
+        // Specialhantering för rörelse (motion)
+        else if (t == "motion")
+        {
+            value = motionCounts.TryGetValue(device.Serial, out var count)
+                ? (rand.NextDouble() < 0.3 ? motionCounts[device.Serial] = count + 1 : count)
+                : (motionCounts[device.Serial] = 0);
+        }
+        // Annars generiskt slumpvärde
+        else
+        {
+            value = rand.NextDouble() * 100;
+        }
 
         metrics.Add(new { type = t, value, unit = InferUnit(t) });
     }
@@ -213,6 +221,9 @@ record Device(Guid Id, Guid TenantId, Guid? RoomId, string Model, string Serial,
 record SimulatorConfig(
     Dictionary<string, string> KnownTypes,
     Dictionary<string, string> Units,
+    Dictionary<string, Range> ValueRanges,
     int intervalSeconds,
     int refreshMinutes
 );
+
+record Range(double min, double max);
