@@ -127,7 +127,7 @@ object[] GenerateMetrics(Device device)
             value = rand.NextDouble() * 100;
         }
 
-        metrics.Add(new { type = t, value, unit = InferUnit(t) });
+        metrics.Add(new { type = t, value = Math.Round(value, t == "motion" ? 0 : 2), unit = InferUnit(t) });
     }
 
     return metrics.ToArray();

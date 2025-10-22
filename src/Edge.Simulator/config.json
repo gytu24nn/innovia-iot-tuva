@@ -6,7 +6,9 @@
         "humid": "humidity",
         "humidity": "humidity",
         "light": "light",
-        "motion": "motion"
+        "motion": "motion",
+        "co2-temp": "co2",
+        "temp-sensor": "temperature"
     },
     "Units": {
         "temperature": "°C",
