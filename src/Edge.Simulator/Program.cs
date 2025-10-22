@@ -67,6 +67,7 @@ Använder mig nu av en config.json fil för att hämta knownTypes.
 */
 string NormalizeType(string model)
 {
+    //Hämta alla ord (bokstäver/siffror) från texten model, gör allt till små bokstäver, och spara dem som en lista av strängar.
     var words = Regex.Matches(model.ToLowerInvariant(), @"\w+").Select(x => x.Value);
 
     foreach (var word in words)
@@ -85,6 +86,7 @@ Om det då inte finns något typ returneras unit som standard för att göra de 
 Använder mig nu av en config.json fil för att hämta units för att göra de mer dynamiskt. 
 */
 string InferUnit(string type) {
+    // Försöker hitta en matchande enhet till type om inte returneras unit.
     return config.Units.TryGetValue(type.ToLowerInvariant(), out var unit) ? unit : "unit";
 }
 
@@ -97,15 +99,19 @@ Alla typer har olika metoder nästan men för att göra de då dynamiskt för at
 Valde jag att göra okända typer får ett generiskt slumpvärde mellan 0-100 detta är inte super dynamiskt men bättre än vad min kod gjorde innan. 
 Resultatet returneras som en array av objekt där varje objekt innehåller sensortyp, värde och enhet. 
 */
+// Genererar ett antal metrics för en given device baserat på dess modell
 object[] GenerateMetrics(Device device)
 {
+    // Om enhet saknar modell returnera en tom array
     if (string.IsNullOrEmpty(device.Model)) return Array.Empty<object>();
 
+    // Dela upp modell strängen på kommatecken till en lista av type (t.ex. "temp,humidity" → ["temp", "humidity"])
     var types = device.Model.Split(',', StringSplitOptions.RemoveEmptyEntries);
     var metrics = new List<object>();
 
     foreach (var type in types)
     {
+        // Normalisera typnamnet (t.ex. trimma mellanslag, formatera rätt)
         var t = NormalizeType(type.Trim());
         double value;
 
@@ -117,6 +123,9 @@ object[] GenerateMetrics(Device device)
         // Specialhantering för rörelse (motion)
         else if (t == "motion")
         {
+            // Om det redan finns ett rörelseräknarvärde för denna enhet
+            // öka värdet ibland (30 % chans), annars behåll det gamla
+            // Om det inte finns något värde än, starta på 0
             value = motionCounts.TryGetValue(device.Serial, out var count)
                 ? (rand.NextDouble() < 0.3 ? motionCounts[device.Serial] = count + 1 : count)
                 : (motionCounts[device.Serial] = 0);
@@ -127,6 +136,7 @@ object[] GenerateMetrics(Device device)
             value = rand.NextDouble() * 100;
         }
 
+         // Lägg till ett nytt objekt med typ, avrundat värde och enhet i metrics-listan
         metrics.Add(new { type = t, value = Math.Round(value, t == "motion" ? 0 : 2), unit = InferUnit(t) });
     }
 
