@@ -130,6 +130,9 @@ object[] GenerateMetrics(Device device)
             value = rand.NextDouble() * 100;
         }
 
+        // Kollar om device.unit ä null/tom och returnerar då true om den är tom annars false. 
+        // Om device.Unit är tomt → kalla på metoden InferUnit(t) och använd resultatet.
+        // Annars → använd device.Unit som redan finns.
         var unit = string.IsNullOrWhiteSpace(device.Unit) ? InferUnit(t) : device.Unit;
 
          // Lägg till ett nytt objekt med typ, avrundat värde och enhet i metrics-listan
