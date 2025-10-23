@@ -115,29 +115,25 @@ object[] GenerateMetrics(Device device)
         var t = NormalizeType(type.Trim());
         double value;
 
-        // Om värdeintervall finns i config.json, använd det
-        if (config.ValueRanges.TryGetValue(t.ToLowerInvariant(), out var range))
+        // försöker för använda min/max från DeviceRegistry om det finns
+        if (device.MinValue != 0 || device.MaxValue != 0)
+        {
+            value = device.MinValue + rand.NextDouble() * (device.MaxValue - device.MinValue);
+        }
+        // Om inget finns i DeviceRegistry, försök använda config.json
+        else if (config.ValueRanges.TryGetValue(t.ToLowerInvariant(), out var range))
         {
             value = range.min + rand.NextDouble() * (range.max - range.min);
         }
-        // Specialhantering för rörelse (motion)
-        else if (t == "motion")
-        {
-            // Om det redan finns ett rörelseräknarvärde för denna enhet
-            // öka värdet ibland (30 % chans), annars behåll det gamla
-            // Om det inte finns något värde än, starta på 0
-            value = motionCounts.TryGetValue(device.Serial, out var count)
-                ? (rand.NextDouble() < 0.3 ? motionCounts[device.Serial] = count + 1 : count)
-                : (motionCounts[device.Serial] = 0);
-        }
-        // Annars generiskt slumpvärde
         else
         {
             value = rand.NextDouble() * 100;
         }
 
+        var unit = string.IsNullOrWhiteSpace(device.Unit) ? InferUnit(t) : device.Unit;
+
          // Lägg till ett nytt objekt med typ, avrundat värde och enhet i metrics-listan
-        metrics.Add(new { type = t, value = Math.Round(value, t == "motion" ? 0 : 2), unit = InferUnit(t) });
+        metrics.Add(new { type = t, value = Math.Round(value, 2), unit});
     }
 
     return metrics.ToArray();
@@ -225,7 +221,7 @@ while (true)
 // Detta är tenant modell och ser exakt likadan ut i diviceRegistry.
 record Tenant(Guid Id, string Name, string Slug);
 // Divice-Model denna matchar också DeviceRegistry API. 
-record Device(Guid Id, Guid TenantId, Guid? RoomId, string Model, string Serial, string Status);
+record Device(Guid Id, Guid TenantId, Guid? RoomId, string Model, string Serial, string Status, string Unit, double MinValue, double MaxValue);
 
 // model för vad som finns i config. 
 record SimulatorConfig(
