@@ -102,5 +102,21 @@ public class InnoviaDbContext : DbContext
 }
 
 // Här skapas klasserna för att man ska kunna skapa tenant och device. 
-public class Tenant { public Guid Id {get; set;} = Guid.NewGuid(); public string Name {get; set;} = ""; public string Slug {get; set;} = ""; }
-public class Device { public Guid Id {get; set;} = Guid.NewGuid(); public Guid TenantId {get; set;} public Guid? RoomId {get; set;} public string Model {get; set;} = ""; public string Serial {get; set;} = ""; public string Status {get; set;} = "active"; }
+public class Tenant
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public string Slug { get; set; } = ""; 
+}
+public class Device
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+    public Guid? RoomId { get; set; }
+    public string Model { get; set; } = "";
+    public string Serial { get; set; } = "";
+    public string Status { get; set; } = "active";
+    public string Unit { get; set; } = "";
+    public double MinValue { get; set; } = 0;
+    public double MaxValue { get; set; }
+}
